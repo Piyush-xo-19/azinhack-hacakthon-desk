@@ -13,7 +13,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
-    "test": "node --test scripts/test-event.mjs",
+    "test": "node --test scripts/test-event.mjs scripts/test-camera.mjs",
     "setup:staff": "node scripts/setup-staff.mjs",
     "build:vercel": "node scripts/migrate.mjs && next build --webpack"
   },
