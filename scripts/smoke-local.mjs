@@ -5,11 +5,8 @@ import jsQR from 'jsqr';
 import { PNG } from 'pngjs';
 const base = process.env.DESK_TEST_URL || 'http://127.0.0.1:5173';
 if (!['127.0.0.1','localhost'].includes(new URL(base).hostname)) throw new Error('QA requires a local preview.');
-if(!process.env.DESK_TEST_EMAIL||!process.env.DESK_TEST_PASSWORD)throw new Error('Set synthetic staff test credentials before running QA.');
-const auth = await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json',Origin:base},body:JSON.stringify({email:process.env.DESK_TEST_EMAIL,password:process.env.DESK_TEST_PASSWORD})});
-assert.equal(auth.status,200);
-const cookie = auth.headers.getSetCookie().map(v=>v.split(';')[0]).join('; ');
-assert.ok(cookie,'Staff sign-in must issue a session cookie');
+if(!process.env.DESK_TEST_EMAIL||!process.env.DESK_TEST_COOKIE)throw new Error('Run through the isolated OIDC production test harness.');
+const cookie=process.env.DESK_TEST_COOKIE;
 async function call(body,authenticated=true){const r=await fetch(base+'/api/desk',{method:body?'POST':'GET',headers:{...(authenticated?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json',Origin:base}:{})},body:body?JSON.stringify(body):undefined});return {status:r.status,data:await r.json()};}
 assert.equal((await call(undefined,false)).status,401);
 const email='local-qa@example.invalid';

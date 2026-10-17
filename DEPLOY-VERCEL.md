@@ -1,89 +1,58 @@
-# Deploy AZINHACK to Vercel (Windows PowerShell)
+# Google OIDC and Vercel setup
 
-The Vercel code is on branch `deploy/vercel` in `C:/Users/LENOVO/Desktop/azinhack`. The previously deployed Sites version is preserved on `master`. The Vercel version uses Next.js, a remote libSQL/Turso database and staff email/password sign-in. The Codex Vercel plugin is optional.
+Production: https://azinhack-hacakthon-desk-yd7c.vercel.app
 
-## 1. Install and create your organizer account
+The `auth/google-oidc` branch replaces password sign-in. Switch production after the Google client and Vercel variables are ready.
 
-Open PowerShell in the project folder:
+## Google Web OAuth client
+
+1. Open https://console.cloud.google.com/auth/clients and select or create an AZINHACK project.
+2. Configure Google Auth Platform branding: app name AZINHACK and your support/contact email.
+3. For personal Gmail, choose External audience. While in Testing, add `pg7267330@gmail.com` as a test user.
+4. Use only sign-in scopes `openid`, `email`, `profile`.
+5. Create an OAuth client: type **Web application**, name **AZINHACK Web**.
+6. Register this exact authorized redirect URI:
+
+```text
+https://azinhack-hacakthon-desk-yd7c.vercel.app/api/auth/google/callback
+```
+
+7. Download the client JSON outside Git. Import it without printing the secret:
 
 ```powershell
 cd C:\Users\LENOVO\Desktop\azinhack
-npm.cmd install
-npm.cmd run setup:staff
+npm.cmd run setup:google -- "C:\path\to\client_secret_download.json" pg7267330@gmail.com
 ```
 
-Enter your organizer email and a password of at least 12 characters. Password input is hidden. The command creates or updates ignored `.env.local` with `SESSION_SECRET` and `STAFF_ACCOUNTS_BASE64`. Do not commit this file. Rerunning the command can add another staff account; all current staff accounts have organizer access.
+This updates ignored `.env.local`, preserves an existing session secret and removes obsolete local password-account settings. It does not update Vercel. Google may require additional branding or verification steps depending on account policy and publication settings.
 
-## 2. Create a shared database
+For local sign-in, register `http://localhost:3000/api/auth/google/callback` on a development client and set `APP_ORIGIN=http://localhost:3000`. Previews need their own matching registered callback and APP_ORIGIN.
 
-Create a libSQL-compatible database in the Turso dashboard at https://turso.tech. Copy its database URL and auth token. Add these lines to the existing `.env.local` file, keeping its generated organizer settings:
+## Production variables
 
-```dotenv
-TURSO_DATABASE_URL=libsql://YOUR_DATABASE_HOST
-TURSO_AUTH_TOKEN=YOUR_DATABASE_AUTH_TOKEN
-```
+- `APP_ORIGIN=https://azinhack-hacakthon-desk-yd7c.vercel.app`
+- `GOOGLE_CLIENT_ID`: downloaded Web client ID
+- `GOOGLE_CLIENT_SECRET`: downloaded Web client secret (sensitive)
+- `STAFF_ALLOWED_EMAILS=pg7267330@gmail.com`
+- `SESSION_SECRET`: retain the existing production secret (at least 32 random characters)
+- `TURSO_ENV_PREFIX=azinhack_` for the current integration
 
-The token and generated login configuration are secrets. Paste them into local configuration and Vercel settings, not chat or Git. A local SQLite file cannot hold durable shared records on Vercel.
+Keep integration-managed `azinhack_TURSO_DATABASE_URL` and `azinhack_TURSO_AUTH_TOKEN` in Vercel. Unprefixed setups use TURSO_DATABASE_URL and TURSO_AUTH_TOKEN with an empty prefix. A comma-separated email allowlist can authorize more trusted organizers; all have full organizer permissions.
 
-## 3. Initialize and verify
+## Verify and deploy
 
 ```powershell
-npm.cmd run db:migrate
+npm.cmd install
 npm.cmd test
 npm.cmd run build
-```
-
-Migrations are tracked by name and checksum and can be safely rerun. Run migrations after pulling future schema updates, before deploying that code. Build uses Webpack to avoid the Windows junction permissions error encountered with Turbopack.
-
-For a local check:
-
-```powershell
-npm.cmd run dev
-```
-
-Open the printed localhost URL and sign in with the email and password you created. Stop the server with Ctrl+C when done. The production login cookie requires HTTPS.
-
-## 4. Sign in and create the Vercel project
-
-```powershell
-npx.cmd vercel login
-npx.cmd vercel link
-```
-
-Complete sign-in in the browser. For linking: choose your account/team, choose to create a new project, name it `azinhack` (or an available name), and use the current directory. Framework is Next.js. Build command is `npm run build`; leave the output directory at its Next.js default. Use Node 24.x, or another Vercel-supported version meeting the package's minimum requirement.
-
-## 5. Add the four required variables
-
-In Vercel open your project, then Settings > Environment Variables. Add the following using the values from `.env.local`, for Production and Preview:
-
-- `TURSO_DATABASE_URL`
-- `TURSO_AUTH_TOKEN`
-- `SESSION_SECRET`
-- `STAFF_ACCOUNTS_BASE64`
-
-Copy the value after `=` exactly; do not include the variable name. The staff configuration is base64 of password hashes, not encryption; treat it as a secret. Use a separate database for previews if you will test destructive operations. The initial project has no participant data and no import happens during deployment.
-
-## 6. Deploy
-
-```powershell
+node scripts/test-vercel-local.mjs --prefix
 npx.cmd vercel deploy --prod
 ```
 
-Vercel prints the production URL. Open it and sign in with your organizer credentials. Verify CSV import, QR download, check-in, lunch and goodies. A repeat collection must be rejected. Test scanning on the actual volunteer phone over HTTPS before event day. Database and login variables are required for a working app; a successful build alone does not verify them.
+Use Node 24. Vercel runs `npm run build:vercel`, including schema migrations. A local build does not migrate a remote database. Integration tests use synthetic identities and an isolated SQLite database; they do not send messages or prove real Google access.
 
-## 7. Configure messages later
+After deployment, verify organizer Google sign-in, rejection of a non-allowlisted Google account, sign-out, CSV import and checkpoint scanning. Once Google login works, remove obsolete STAFF_ACCOUNTS / STAFF_ACCOUNTS_BASE64 production variables and retire the old organizer password file. OIDC code ignores both legacy variables and cookies.
 
-Email and WhatsApp remain disabled until sender variables are configured. See `.env.example` for names. Email uses Resend with a verified sender. WhatsApp requires a Business sender and an approved template with an image header and one text body variable for the participant name. Redeploy after changing Vercel environment variables.
+Email/WhatsApp still need sender credentials listed in `.env.example`. Authentication changes preserve participant data and QR identities.
 
-Provider adapters track acceptance, not final delivery receipts. Bulk dispatch and volunteer roles are not implemented. Staff can access participant contact records and imports; only create accounts for trusted event staff. Existing Sites records are not migrated automatically. If real participant data was added there, export and plan its migration before using the Vercel app.
-
-## Useful links
-
-- Vercel deployment: https://vercel.com/docs/projects/deploy-from-cli
-- Turso TypeScript reference: https://docs.turso.tech/sdk/ts/reference
-
-### Vercel integration prefixes and migrations
-
-If Turso created variables such as `azinhack_TURSO_DATABASE_URL` and `azinhack_TURSO_AUTH_TOKEN`, set `TURSO_ENV_PREFIX=azinhack_` in the same Vercel environment. Leave the prefix empty for the default variable names. Keep the integration-managed secrets in Vercel; they do not need to be downloaded locally.
-
-Vercel now runs `npm run build:vercel`, which applies pending schema migrations before building Next.js. This lets the build use the connected Turso secrets directly. A local `npm run build` still checks the app without applying database migrations. Migrations are schema-only and checksum-tracked; inspect schema changes before deploying future versions.
+Official reference: https://developers.google.com/identity/openid-connect/openid-connect

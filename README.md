@@ -1,19 +1,17 @@
 # AZINHACK
 
-QR-based hackathon operations: participant imports, attendance, lunch and goodies, unique QR passes and email/WhatsApp delivery adapters.
+QR-based hackathon operations: participant CSV imports, attendance, lunch and goodies, unique QR passes, and email/WhatsApp provider adapters. Next.js runs on Vercel with shared Turso/libSQL records.
 
-This branch (`deploy/vercel`) is the Vercel migration. The original private Sites deployment is preserved on `master` and has not been redeployed from this branch.
+This branch replaces password authentication with Google OpenID Connect. Only verified Google accounts in `STAFF_ALLOWED_EMAILS` can access organizer operations. Authorization uses code flow with PKCE, state, nonce and signed ID-token verification. Sessions expire after 12 hours; the allowlist is checked on every request. Legacy password cookies and the password endpoint cannot grant access.
 
-See `DEPLOY-VERCEL.md` for the complete Windows deployment steps. Vercel uses standard Next.js with a remote libSQL/Turso database and staff email/password login. Required environment variables: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `SESSION_SECRET`, and `STAFF_ACCOUNTS_BASE64` (or a manually configured `STAFF_ACCOUNTS` JSON array).
+See `DEPLOY-VERCEL.md` for Google client setup and deployment. Configure ignored `.env.local` using `.env.example`, then run `npm install`, `npm run db:migrate`, `npm test` and `npm run build`. Vercel runs `npm run build:vercel` to apply checksum-tracked schema migrations before building. Use separate databases and OAuth configuration for previews.
 
-Quick setup: `npm install`, `npm run setup:staff`, add database settings in ignored `.env.local`, then `npm run db:migrate`, `npm test`, and `npm run build`. Use `npm run dev` for local preview. Do not commit `.env.local`, participant exports or database files.
+Re-importing a matching email updates contact details while preserving the participant ID, QR token and checkpoint records. Claims are atomic and unique per participant/checkpoint. Attendance is required before lunch and goodies. QR tokens contain random identifiers rather than contact details.
 
-Re-importing a matching email updates contact details while preserving the existing participant ID, QR token and checkpoint records. Claims are atomic and unique per participant/checkpoint. Attendance is required before lunch and goodies. QR tokens contain random identifiers rather than contact details.
+All allowlisted staff have organizer access. Sender adapters remain disabled until configured. Provider acceptance is recorded; delivery receipts and bulk dispatch are not implemented. Never commit participant data, OAuth client JSON, environment files or databases.
 
-All configured staff accounts currently have organizer access. Create them only for trusted staff. No public registration endpoint is implemented. Sender adapters remain disabled until credentials are configured; provider acceptance is recorded, while delivery receipts and bulk sending are not implemented.
+`npm test` covers event rules, camera behavior and OIDC grant validation with mocked provider responses. After building, `node scripts/test-vercel-local.mjs --prefix` checks an isolated production server with synthetic sessions and records: authorization, retired password login, callback rejection, logout CSRF, concurrent claims, import stability and QR decoding. Real Google account sign-in and physical phone cameras still need deployment checks.
 
-The isolated production smoke test is `node scripts/test-vercel-local.mjs`. It creates synthetic staff and participants in an ignored local database, tests login and rate limiting, rejects spoofed identity headers and cross-origin requests, verifies concurrent duplicate checks and re-import stability, and round-trips a generated QR image. It never sends messages. An actual remote database and phone camera still need event-day checks after deployment.
+Scanner capture requests 1920x1080 where available and applies supported autofocus. Users can select a lens, refocus and enable a supported camera light. Decoding is capped separately at 1280 pixels to keep phones responsive.
 
-Local commits are created automatically for completed verified milestones, as requested. There is no configured GitHub remote. Deploy using the Vercel CLI or connect your own repository.
-
-Scanner capture requests 1920x1080 where available and applies autofocus only when advertised by the camera. The preview preserves its full captured frame. After permission, users can choose another lens; supported devices also offer refocus and a camera light. Decoding is capped separately at 1280 pixels on the longest side to keep phones responsive. Optional focus/light failures do not prevent scanning. Automated camera tests use mocked media devices; actual lens quality and focus need testing on the volunteer phones.
+Verified milestones are committed automatically. Repository: https://github.com/Piyush-xo-19/azinhack-hacakthon-desk . The original Sites version remains on `master`. Production stays on `deploy/vercel` until Google credentials and the OIDC rollout are verified.
