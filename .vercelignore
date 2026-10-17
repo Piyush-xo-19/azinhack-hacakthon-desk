@@ -1,0 +1,14 @@
+.git
+.openai
+.sites-runtime
+.wrangler
+.vinext
+build
+examples
+outputs
+work
+*.db
+*.db-wal
+*.db-shm
+.env*
+!.env.example

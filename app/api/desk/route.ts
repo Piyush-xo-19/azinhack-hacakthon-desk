@@ -1,15 +1,17 @@
-import { env } from 'cloudflare:workers';
-import { getChatGPTUser } from '../../chatgpt-auth';
+import { getDatabase } from '@/lib/database';
+import { getStaffUser } from '@/lib/staff-auth';
+import { isSameOrigin } from '@/lib/request';
 import { actions, normalizeRow, validateRow, type ImportRow } from '@/lib/event';
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 const json = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
-const db = () => { if (!env.DB) throw new Error('Database unavailable.'); return env.DB; };
+const db = getDatabase;
 function settings() {
-  const e = env as unknown as Record<string, string>;
+  const e = process.env;
   return { email: !!(e.RESEND_API_KEY && e.EMAIL_FROM), whatsapp: !!(e.WHATSAPP_ACCESS_TOKEN && e.WHATSAPP_PHONE_NUMBER_ID && e.WHATSAPP_TEMPLATE_NAME && e.WHATSAPP_GRAPH_VERSION) };
 }
 export async function GET() {
-  if (!await getChatGPTUser()) return json({ error: 'Please sign in.' }, 401);
+  if (!await getStaffUser()) return json({ error: 'Please sign in.' }, 401);
   try {
     const [ps, cs, ds] = await Promise.all([
       db().prepare('SELECT * FROM participants ORDER BY created_at DESC, name').all(),
@@ -20,10 +22,9 @@ export async function GET() {
   } catch { return json({ error: 'Could not load shared event records. Please try again.' }, 503); }
 }
 export async function POST(request: Request) {
-  const user = await getChatGPTUser();
+  const user = await getStaffUser();
   if (!user) return json({ error: 'Please sign in.' }, 401);
-  const origin = request.headers.get('origin');
-  if (origin && origin !== new URL(request.url).origin) return json({ error: 'Invalid request origin.' }, 403);
+  if (!isSameOrigin(request,true)) return json({ error: 'Invalid request origin.' }, 403);
   if (Number(request.headers.get('content-length')) > 2_000_000) return json({ error: 'Request is too large.' }, 413);
   try {
     const body = await request.json() as Record<string, unknown>;
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
       if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(png) || png.length > 300000) return json({ error: 'A valid QR image is required.' }, 400);
       const reserve = await db().prepare("INSERT INTO deliveries (participant_id,channel,status,at) VALUES (?,?,'sending',?) ON CONFLICT(participant_id,channel) DO UPDATE SET status='sending',at=excluded.at,error=NULL WHERE deliveries.status='failed'").bind(p.id, channel, Date.now()).run();
       if (!reserve.meta.changes) return json({ error: 'Already submitted or awaiting confirmation. Check delivery status before retrying.' }, 409);
-      const e = env as unknown as Record<string, string>; let externalStarted = false;
+      const e = process.env; let externalStarted = false;
       try {
         let providerId = '';
         if (channel === 'email') {
@@ -97,3 +98,4 @@ export async function POST(request: Request) {
     return json({ error: 'Unknown operation.' }, 400);
   } catch { return json({ error: 'Could not save this operation. Refresh and check the current status before retrying.' }, 500); }
 }
+

@@ -1,7 +1,7 @@
 import Desk from './desk';
-import { requireChatGPTUser } from './chatgpt-auth';
+import { requireStaffUser } from '@/lib/staff-auth';
 export const dynamic = 'force-dynamic';
 export default async function Home() {
-  const user = await requireChatGPTUser('/');
+  const user = await requireStaffUser();
   return <Desk operator={user.displayName} />;
 }
