@@ -1,11 +1,13 @@
 import { createClient, type Client, type InValue } from '@libsql/client';
 let client: Client | undefined;
 export function databaseClient() {
-  const url = process.env.TURSO_DATABASE_URL;
+  const prefix = process.env.TURSO_ENV_PREFIX || '';
+  const url = process.env[prefix+'TURSO_DATABASE_URL'];
   if (!url) throw new Error('Set TURSO_DATABASE_URL before accessing participant records.');
   if (process.env.VERCEL && (!/^libsql:\/\//.test(url) && !/^https:\/\//.test(url))) throw new Error('Vercel requires a remote durable database.');
-  if (process.env.VERCEL && !process.env.TURSO_AUTH_TOKEN) throw new Error('Set TURSO_AUTH_TOKEN for the hosted database.');
-  return client ??= createClient({url,authToken:process.env.TURSO_AUTH_TOKEN});
+  const authToken = process.env[prefix+'TURSO_AUTH_TOKEN'];
+  if (process.env.VERCEL && !authToken) throw new Error('Set TURSO_AUTH_TOKEN for the hosted database.');
+  return client ??= createClient({url,authToken});
 }
 class Statement {
   constructor(readonly sql: string, readonly args: InValue[] = []) {}

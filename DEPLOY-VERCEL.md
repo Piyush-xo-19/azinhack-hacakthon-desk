@@ -81,3 +81,9 @@ Provider adapters track acceptance, not final delivery receipts. Bulk dispatch a
 
 - Vercel deployment: https://vercel.com/docs/projects/deploy-from-cli
 - Turso TypeScript reference: https://docs.turso.tech/sdk/ts/reference
+
+### Vercel integration prefixes and migrations
+
+If Turso created variables such as `azinhack_TURSO_DATABASE_URL` and `azinhack_TURSO_AUTH_TOKEN`, set `TURSO_ENV_PREFIX=azinhack_` in the same Vercel environment. Leave the prefix empty for the default variable names. Keep the integration-managed secrets in Vercel; they do not need to be downloaded locally.
+
+Vercel now runs `npm run build:vercel`, which applies pending schema migrations before building Next.js. This lets the build use the connected Turso secrets directly. A local `npm run build` still checks the app without applying database migrations. Migrations are schema-only and checksum-tracked; inspect schema changes before deploying future versions.

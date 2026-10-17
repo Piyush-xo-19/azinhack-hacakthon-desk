@@ -10,6 +10,7 @@ const dir=await mkdtemp(path.resolve('.sites-runtime/vercel-qa-'));
 const email='organizer-qa@example.invalid',password=randomBytes(24).toString('hex'),salt=randomBytes(16).toString('hex');
 const account={email,name:'QA Organizer',passwordHash:'scrypt$'+salt+'$'+scryptSync(password,salt,64).toString('hex')};
 const env={...process.env,NODE_ENV:'production',TURSO_DATABASE_URL:pathToFileURL(path.join(dir,'qa.db')).href,TURSO_AUTH_TOKEN:'',SESSION_SECRET:randomBytes(48).toString('hex'),STAFF_ACCOUNTS:'[]',STAFF_ACCOUNTS_BASE64:Buffer.from(JSON.stringify([account])).toString('base64'),DESK_TEST_URL:'http://127.0.0.1:3101',DESK_TEST_EMAIL:email,DESK_TEST_PASSWORD:password,RESEND_API_KEY:'',WHATSAPP_ACCESS_TOKEN:''};
+if(process.argv.includes('--prefix')){env.TURSO_ENV_PREFIX='QA_';env.QA_TURSO_DATABASE_URL=env.TURSO_DATABASE_URL;env.QA_TURSO_AUTH_TOKEN='';env.TURSO_DATABASE_URL='file:unselected-db-must-not-be-used';}
 const migration=spawnSync(process.execPath,['scripts/migrate.mjs'],{env,encoding:'utf8'});assert.equal(migration.status,0,migration.stderr);console.log(migration.stdout);
 const again=spawnSync(process.execPath,['scripts/migrate.mjs'],{env,encoding:'utf8'});assert.equal(again.status,0,again.stderr);
 let logs='';const server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','3101'],{env,stdio:['ignore','pipe','pipe']});

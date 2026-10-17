@@ -14,7 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
     "test": "node --test scripts/test-event.mjs",
-    "setup:staff": "node scripts/setup-staff.mjs"
+    "setup:staff": "node scripts/setup-staff.mjs",
+    "build:vercel": "node scripts/migrate.mjs && next build --webpack"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
